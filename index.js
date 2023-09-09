@@ -1,5 +1,8 @@
 const inquirer = require('inquirer');
 const mysql = require('mysql2');
+let departments;  
+let roles;
+let employees;
 
 const db = mysql.createConnection(
     {
@@ -24,7 +27,7 @@ function init() {
     ])
     .then((answers) => {
         switch(answers.database_choices) {
-            case 'Exit':
+            case 'Exit': // Adding option to allow for exiting out of the node process
                 console.log('Bye!');
                 process.exit();
                 break;
@@ -41,7 +44,7 @@ function init() {
                 break;
             case 'View all roles':
                 console.log('Displaying all roles');
-                db.query('SELECT * FROM roles', (err, res) => {
+                db.query('SELECT roles.id, roles.title, roles.salary, departments.name AS department_name FROM roles INNER JOIN departments ON roles.department_id = departments.id;', (err, res) => { // Using join to display the correct information
                     if (err) {
                         throw err;
                     }
@@ -52,7 +55,7 @@ function init() {
                 break;
             case 'View all employees':
                 console.log('Displaying all employees');
-                db.query('SELECT * FROM employees', (err, res) => {
+                db.query("SELECT employees.id, employees.first_name, employees.last_name, roles.title, departments.name AS department_name, roles.salary, employees_2.full_name AS manager FROM employees INNER JOIN roles ON employees.role_id = roles.id INNER JOIN departments ON roles.department_id = departments.id LEFT JOIN employees AS employees_2 ON employees.manager_id = employees_2.id;", (err, res) => {
                     if (err) {
                         throw err;
                     }
@@ -62,13 +65,120 @@ function init() {
                 init();
                 break;
             case 'Add a department':
-                init();
+                inquirer.prompt([
+                    {
+                        type: "prompt",
+                        message: "What is the name of the department?",
+                        name: "department_name",
+                    }
+                ])
+                .then((department_answers) => {
+                    db.query(`INSERT INTO departments(name) VALUES ('${department_answers.department_name}')`, (err, res) => {
+                        if (err) {
+                            throw err;
+                        }
+                      });
+                      init();
+                });
                 break;
             case 'Add a role':
-                init();
+                departments = []; // Resettings departments
+                db.query('SELECT name FROM departments', (err, res) => {
+                    if (err) {
+                        throw err;
+                    }
+                    for (let i = 0; i < res.length; i++) {
+                        departments.push(res[i].name); // Filling empty array with names of all of the departments
+                    }
+                  });
+                inquirer.prompt([
+                    {
+                        type: "prompt",
+                        message: "What is the name of the role?",
+                        name: "role_name",
+                    },
+                    {
+                        type: "prompt",
+                        message: "What is the salary of the role?",
+                        name: "role_salary"
+                    },
+                    {
+                        type: "list",
+                        message: "What department is the role in?",
+                        name: "role_department",
+                        choices: departments
+                    }
+                ])
+                .then((role_answers) => {
+                    db.query(`INSERT INTO roles(title, salary, department_id) VALUES ('${role_answers.role_name}', ${role_answers.role_salary}, ${departments.indexOf(role_answers.role_department) + 1})`, (err, res) => {
+                        if (err) {
+                            throw err;
+                        }
+                      });
+                      init();
+                });
                 break;
             case 'Add an employee':
-                init();
+                roles = []; // Resetting roles
+                db.query('SELECT title FROM roles', (err, res) => {
+                    if (err) {
+                        throw err;
+                    }
+                    for (let i = 0; i < res.length; i++) {
+                        roles.push(res[i].title); // Filling empty array with names of all of the roles
+                    }
+                  });
+
+                  employees = ['No manager']; // Resetting employees
+                  db.query('SELECT full_name FROM employees', (err, res) => {
+                      if (err) {
+                          throw err;
+                      }
+                      for (let i = 0; i < res.length; i++) {
+                          employees.push(res[i].full_name); // Filling empty array with names of all of the roles
+                      }
+                    });
+                inquirer.prompt([
+                    {
+                        type: "prompt",
+                        message: "What is the first name of the employee?",
+                        name: "employee_first",
+                    },
+                    {
+                        type: "prompt",
+                        message: "What is the last name of the employee?",
+                        name: "employee_last"
+                    },
+                    {
+                        type: "list",
+                        message: "What role does the exmployee have?",
+                        name: "employee_role",
+                        choices: roles
+                    },
+                    {
+                        type: "list",
+                        message: "Does the employee have a manager?",
+                        name: "employee_manager",
+                        choices: employees
+                    }
+                ])
+                .then((employee_answers) => {
+                    if (employee_answers.employee_manager === 'No manager') {
+                        db.query(`INSERT INTO employees(first_name, last_name, full_name, role_id, manager_id) VALUES ('${employee_answers.employee_first}', ${employee_answers.employee_last}, ${employee_answers.employee_first + ' '  + employee_answers.employee_last}, ${roles.indexOf(employee_answers.employee_role) + 1}, null)`, (err, res) => {
+                            if (err) {
+                                throw err;
+                            }
+                          });
+                          init();
+                    } else {
+                        db.query(`INSERT INTO employees(first_name, last_name, full_name, role_id, manager_id) VALUES ('${employee_answers.employee_first}', ${employee_answers.employee_last}, ${employee_answers.employee_first + ' '  + employee_answers.employee_last}, ${roles.indexOf(employee_answers.employee_role) + 1}, ${employees.indexOf(employee_answers.employee_manager) + 2})`, (err, res) => {
+                            if (err) {
+                                throw err;
+                            }
+                          });
+                          init();
+                    }
+                });
                 break;
             case 'Update an employee role':
                 init();
