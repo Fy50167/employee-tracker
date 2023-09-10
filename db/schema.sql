@@ -26,3 +26,5 @@ CREATE TABLE employees (
     FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE SET NULL,
     FOREIGN KEY (manager_id) REFERENCES employees(id) ON DELETE SET NULL
 );
+
+INSERT INTO employees(first_name, last_name, full_name, role_id, manager_id) VALUES ('Bungus', 'Blast', 'Bungus Blast', 3, 4);
